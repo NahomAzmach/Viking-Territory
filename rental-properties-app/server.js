@@ -5,6 +5,7 @@ const cors = require('cors');
 const { exec } = require('child_process');
 const cron = require('node-cron');
 const path = require('path');
+const port = process.env.PORT || 5000;
 
 // Create connection pool instead of single connection
 const pool = mysql.createPool({
@@ -18,8 +19,14 @@ const pool = mysql.createPool({
 });
 
 const app = express();
-app.use(cors({ origin: '*' }));
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? 'https://your-render-app-name.onrender.com' 
+    : '*'
+}));
+
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'client/build')));
 
 // Health check endpoint
 app.get('/health', (req, res) => {

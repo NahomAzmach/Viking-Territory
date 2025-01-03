@@ -7,7 +7,11 @@ import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 import './PropertyList.css';
 
-// Fix Leaflet default icon issue
+
+const API_URL = process.env.NODE_ENV === 'production'
+  ? '' //Empty string for same-origin requests in production
+  : 'http://192.168.0.35:5000';
+
 let DefaultIcon = L.icon({
   iconUrl: icon,
   shadowUrl: iconShadow,
@@ -19,6 +23,8 @@ L.Marker.prototype.options.icon = DefaultIcon;
 function PropertyList() {
   const [properties, setProperties] = useState([]);
   const [filteredProperties, setFilteredProperties] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
     address: '',
     minPrice: '',
@@ -26,7 +32,8 @@ function PropertyList() {
   });
 
   useEffect(() => {
-    axios.get('http://192.168.0.35:5000/properties')
+    setIsLoading(true);
+    axios.get(`${API_URL}/properties`)
       .then(response => {
         const formattedProperties = response.data.map(prop => ({
           ...prop,
@@ -36,8 +43,14 @@ function PropertyList() {
         setProperties(formattedProperties);
         setFilteredProperties(formattedProperties);
       })
-      .catch(error => console.error('Error fetching properties:', error));
-  }, []);
+      .catch(error => {
+        console.error('Error fetching properties:', error);
+        setError('Failed to load properties. Please try again later.');
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+    }, []);
 
   useEffect(() => {
     const filtered = properties.filter(property => {
@@ -54,6 +67,14 @@ function PropertyList() {
     const { name, value } = e.target;
     setFilters(prev => ({ ...prev, [name]: value }));
   };
+  
+  if (isLoading) {
+    return <div className="loading-state">Loading properties...</div>;
+  }
+
+  if (error) {
+    return <div className="error-state">{error}</div>;
+  }
 
   return (
     <div className="property-list-container">
