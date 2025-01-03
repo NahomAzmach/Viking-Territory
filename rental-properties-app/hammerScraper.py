@@ -81,7 +81,7 @@ def save_to_mysql(data, source):
                 mydb.rollback() # eeeerrrorrrrrr
 
         
-    mydb.commit()
+        mydb.commit()
 
         print(f"Inserted {inserted_count} new properties.")
         print(f"Updated {updated_count} existing properties.")
@@ -89,6 +89,7 @@ def save_to_mysql(data, source):
     except mysql.connector.Error as err:
         print(f"Database Error: {err}")
     finally:
+        
         if 'cursor' in locals():
             cursor.close()
         if 'mydb' in locals() and mydb.is_connected():
