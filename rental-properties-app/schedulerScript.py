@@ -27,10 +27,10 @@ def main():
     # Schedule scraper to run every 3 hours
     schedule.every(3).hours.do(run_scraper)
     
-    # Run immediately on startup
+    # right on startup
     run_scraper()
     
-    logging.info("Scheduler running. Press Ctrl+C to exit.")
+    logging.info("Scheduler running. Ctrl+C to exit.")
     
     while True:
         try:
