@@ -1,0 +1,31 @@
+{
+  "name": "rental-properties-app",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",                
+    "build": "cd client && npm install && npm run build",
+    "heroku-postbuild": "npm run build",
+    "dev": "nodemon server.js",
+    "heroku-postbuild": "cd client && npm install && npm run build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Rental Properties Application",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.1",
+    "mysql2": "^3.11.5",
+    "node-cron": "^3.0.3",
+    "react-slick": "^0.30.3",
+    "slick-carousel": "^1.8.1"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
