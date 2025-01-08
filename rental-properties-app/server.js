@@ -35,7 +35,7 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'healthy' });
 });
 
-// Improved error handling for properties endpoint
+// Improved error handling for properties endpoint instead kf the other approach i took
 app.get('/properties', async (req, res) => {
   try {
     const [results] = await pool.promise().query('SELECT * FROM properties');
@@ -50,7 +50,7 @@ app.get('/properties', async (req, res) => {
   }
 });
 
-// Add endpoint to manually trigger scraper
+// add end point for another server ... 
 app.post('/trigger-scraper', async (req, res) => {
   try {
     exec('python combinedScraper.py', (error, stdout, stderr) => {
