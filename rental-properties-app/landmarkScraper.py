@@ -91,7 +91,9 @@ def save_to_mysql(data, source):
 
 # Function to scrape properties
 def scrape_showmojo_properties():
-    # Path to your downloaded ChromeDriver
+
+    # scrape for rooms by seatching for elements
+    
     driver_path = '/Users/Nahom/Desktop/chromedriver-win32/chromedriver.exe'
     service = Service(driver_path)
 
