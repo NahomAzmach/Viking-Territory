@@ -1,106 +1,28 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
-import mysql.connector
 import time
 import json
-
-def save_to_mysql(data, source):
-    try:
-        # Connect to the database
-        mydb = mysql.connector.connect(
-            host=os.getenv('DB_HOST', 'localhost'),
-            user=os.getenv('DB_USER', 'root'),
-            password=os.getenv('DB_PASSWORD'),
-            database=os.getenv('DB_NAME', 'rental_properties')
-        )
-        cursor = mydb.cursor(buffered=True)
-
-        # Fetch all existing property links from the database
-        cursor.execute("SELECT link FROM properties WHERE source = %s", (source,))
-        existing_links = {row[0] for row in cursor.fetchall()}
-
-        # Extract new links from the current data
-        new_links = {property['link'] for property in data}
-
-        # Identify outdated properties (present in the database but not in the new scrape)
-        # Only for this specific source
-        outdated_links = existing_links - new_links
-
-        # Remove outdated properties from this source only
-        if outdated_links:
-            print(f"Removing {len(outdated_links)} outdated {source} properties...")
-            delete_query = "DELETE FROM properties WHERE link = %s AND source = %s"
-            for link in outdated_links:
-                cursor.execute(delete_query, (link, source))
-            mydb.commit()
-            print(f"Outdated {source} properties removed.")
-
-        # Insert or update properties in the database
-        add_property_query = (
-            "INSERT INTO properties "
-            "(title, price, image_url, link, address, image_urls, latitude, longitude, source) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) "
-            "ON DUPLICATE KEY UPDATE "
-            "title = VALUES(title), price = VALUES(price), "
-            "image_url = VALUES(image_url), address = VALUES(address), "
-            "image_urls = VALUES(image_urls), latitude = VALUES(latitude), "
-            "longitude = VALUES(longitude), source = VALUES(source), "
-            "last_updated = NOW()"
-        )
-
-        inserted_count = 0
-        updated_count = 0
-
-        for property in data:
-            try:
-                property_data = (
-                    property['title'],
-                    property['price'],
-                    property['image_url'],
-                    property['link'],
-                    property['address'],
-                    json.dumps(property['image_urls']),
-                    property.get('latitude'),
-                    property.get('longitude'),
-                    source  # Convert image URLs to JSON
-                )
-                cursor.execute(add_property_query, property_data)
-
-                # Check if the query was an insert or update
-                if cursor.rowcount == 1:
-                    inserted_count += 1
-                elif cursor.rowcount == 2:
-                    updated_count += 1
-
-            except mysql.connector.Error as err:
-                print(f"Error processing property {property['title']}: {err}")
-                mydb.rollback() # eeeerrrorrrrrr
-
-        
-        mydb.commit()
-
-        print(f"Inserted {inserted_count} new properties.")
-        print(f"Updated {updated_count} existing properties.")
-
-    except mysql.connector.Error as err:
-        print(f"Database Error: {err}")
-    finally:
-        
-        if 'cursor' in locals():
-            cursor.close()
-        if 'mydb' in locals() and mydb.is_connected():
-            mydb.close()
+import os
 
 def scrape_hammer_properties():
-    driver_path = '/Users/Nahom/Desktop/chromedriver-win32/chromedriver.exe'
-    service = Service(driver_path)
-    driver = webdriver.Chrome(service=service)
+    # Set up headless Chrome for EC2
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    
+    # Path to ChromeDriver - EC2 Amazon Linux 2 location
+    driver_path = '/usr/bin/chromedriver'
     
     try:
+        service = Service(driver_path)
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        
         url = 'https://www.hammerpropertiesnw.com/availability'
         driver.get(url)
         
@@ -208,7 +130,8 @@ def scrape_hammer_properties():
         return []
         
     finally:
-        driver.quit()
+        if 'driver' in locals():
+            driver.quit()
 
 if __name__ == "__main__":
     print("Starting property scraper...")
@@ -216,6 +139,7 @@ if __name__ == "__main__":
     
     if properties:
         print(f"\nSuccessfully scraped {len(properties)} properties")
-        save_to_mysql(properties, source="Hammer")
+        # I would save the properties onto dynamo here id it was the standalone version
+        # But in the combined version, this is handled by combinedScraper.py
     else:
         print("No properties were scraped")
