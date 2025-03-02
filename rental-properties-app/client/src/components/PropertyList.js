@@ -19,8 +19,9 @@ let DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
+// For AWS EC2 deployment
 const API_URL = process.env.NODE_ENV === 'production' 
-  ? '' 
+  ? '' // This will be the root URL of tha EC2 instance
   : 'http://localhost:5000';
 
 function PropertyList() {
@@ -31,31 +32,52 @@ function PropertyList() {
     minPrice: '',
     maxPrice: '',
   });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
+    setLoading(true);
     axios.get(`${API_URL}/properties`)
       .then((response) => {
+        // Format properties from DynamoDB response
         const formattedProperties = response.data.map((prop) => ({
           ...prop,
+          // Parse coordinates, giving fallbacks for missing values
           latitude: parseFloat(prop.latitude) || 48.7519,
           longitude: parseFloat(prop.longitude) || -122.4787,
-          imgUrlsArray:
-            prop.source === 'Hammer' && prop.img_urls
-              ? JSON.parse(prop.img_urls) // Parse JSON string for Hammer properties
-              : [],
+          //image URLs parsing
+          // DynamoDB might store this either as a string or as a native list so we must beware
+          imgUrlsArray: (() => {
+            if (prop.source === 'Hammer') {
+              if (typeof prop.image_urls === 'string') {
+                try {
+                  return JSON.parse(prop.image_urls);
+                } catch (e) {
+                  console.error('Error parsing image URLs:', e);
+                  return [];
+                }
+              } else if (Array.isArray(prop.image_urls)) {
+                return prop.image_urls;
+              }
+            }
+            return [];
+          })()
         }));
         setProperties(formattedProperties);
         setFilteredProperties(formattedProperties);
+        setLoading(false);
       })
       .catch((error) => {
         console.error('Error details:', error.response || error);
-        alert('Failed to load properties. Please check the console for details.');
+        setError('Failed to load properties. Please try again later.');
+        setLoading(false);
       });
   }, []);
 
   useEffect(() => {
     const filtered = properties.filter((property) => {
       const addressMatch = property.address.toLowerCase().includes(filters.address.toLowerCase());
+      // Extract numeric price value, handling different formats
       const price = parseInt(property.price?.replace(/[^0-9]/g, ''), 10) || 0;
       const minPriceMatch = !filters.minPrice || price >= parseInt(filters.minPrice, 10);
       const maxPriceMatch = !filters.maxPrice || price <= parseInt(filters.maxPrice, 10);
@@ -76,6 +98,14 @@ function PropertyList() {
     slidesToShow: 1,
     slidesToScroll: 1,
   };
+
+  if (loading) {
+    return <div className="loading">Loading properties...</div>;
+  }
+
+  if (error) {
+    return <div className="error">{error}</div>;
+  }
 
   return (
     <div className="property-list-container">
@@ -113,44 +143,52 @@ function PropertyList() {
 
       <div className="property-list-and-map">
         <div className="property-list">
-          {filteredProperties.map((property) => (
-            <div className="property-item" key={property.id || property.address}>
-              {property.source === 'Hammer' && property.imgUrlsArray.length > 0 ? (
-                <Slider {...carouselSettings}>
-                  {property.imgUrlsArray.map((url, idx) => (
-                    <img
-                      key={idx}
-                      className="property-image"
-                      src={url}
-                      alt={`Image ${idx + 1} of ${property.address}`}
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = 'https://via.placeholder.com/300x200?text=No+Image';
-                      }}
-                    />
-                  ))}
-                </Slider>
-              ) : (
-                <img
-                  className="property-image"
-                  src={property.image_url || 'https://via.placeholder.com/300x200?text=No+Image'}
-                  alt={property.address}
-                />
-              )}
-              <p className="property-price">{property.price}</p>
-              <p className="property-address">{property.address}</p>
-              {property.link && (
-                <a
-                  className="property-link"
-                  href={property.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  View Listing
-                </a>
-              )}
-            </div>
-          ))}
+          {filteredProperties.length === 0 ? (
+            <div className="no-properties">No properties match your criteria</div>
+          ) : (
+            filteredProperties.map((property) => (
+              <div className="property-item" key={property.link}>
+                {property.source === 'Hammer' && property.imgUrlsArray && property.imgUrlsArray.length > 0 ? (
+                  <Slider {...carouselSettings}>
+                    {property.imgUrlsArray.map((url, idx) => (
+                      <img
+                        key={idx}
+                        className="property-image"
+                        src={url}
+                        alt={`Image ${idx + 1} of ${property.address}`}
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = 'https://via.placeholder.com/300x200?text=No+Image';
+                        }}
+                      />
+                    ))}
+                  </Slider>
+                ) : (
+                  <img
+                    className="property-image"
+                    src={property.image_url || 'https://via.placeholder.com/300x200?text=No+Image'}
+                    alt={property.address}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = 'https://via.placeholder.com/300x200?text=No+Image';
+                    }}
+                  />
+                )}
+                <p className="property-price">{property.price}</p>
+                <p className="property-address">{property.address}</p>
+                {property.link && (
+                  <a
+                    className="property-link"
+                    href={property.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    View Listing
+                  </a>
+                )}
+              </div>
+            ))
+          )}
         </div>
 
         <div className="map-container">
@@ -168,7 +206,7 @@ function PropertyList() {
                 property.latitude &&
                 property.longitude && (
                   <Marker
-                    key={property.id || property.address}
+                    key={property.link}
                     position={[property.latitude, property.longitude]}
                   >
                     <Popup>
